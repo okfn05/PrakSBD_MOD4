@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Smart Library - Fixed</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f8f9fa; }
+        h1, h3 { color: #333; }
+        table { width: 100%; border-collapse: collapse; background: white; margin-bottom: 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        .form-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        button { width: 100%; padding: 12px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; }
+        button:hover { background-color: #218838; }
+        
+        #message { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; font-size: 14px; }
+        .success { display: block !important; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { display: block !important; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <h1>📚 Daftar Koleksi Buku</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Judul Buku</th>
+                <th>Penulis</th>
+                <th>Kategori</th>
+                <th>Sisa Stok</th>
+            </tr>
+        </thead>
+        <tbody id="book-list">
+            </tbody>
+    </table>
+
+    <div class="form-container">
+        <h3>Pinjam Buku</h3>
+        <div class="form-group">
+            <label>ID Buku</label>
+            <input type="text" id="book-id" placeholder="Masukkan ID Buku">
+        </div>
+        <div class="form-group">
+            <label>ID Member</label>
+            <input type="text" id="member-id" placeholder="Masukkan ID Member">
+        </div>
+        <button onclick="pinjamBuku()">Konfirmasi Pinjam</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+
+        // 1. Fungsi Load Data Buku
+        async function fetchBooks() {
+            try {
+                const response = await fetch(`${API_URL}/books`);
+                const books = await response.json();
+                
+                console.log("Data diterima:", books); // Cek struktur data di console F12
+
+                const tableBody = document.getElementById('book-list');
+                
+                if (Array.isArray(books)) {
+                    tableBody.innerHTML = books.map(book => {
+                        // Solusi untuk error undefined: Cek ketersediaan property
+                        const stok = book.available_copies !== undefined ? book.available_copies : (book.stock !== undefined ? book.stock : 0);
+                        
+                        return `
+                            <tr>
+                                <td>${book.title || 'Tanpa Judul'}</td>
+                                <td>${book.author_name || 'N/A'}</td>
+                                <td>${book.category_name || 'Umum'}</td>
+                                <td><strong>${stok}</strong></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error("Error fetch data:", error);
+            }
+        }
+
+        // 2. Fungsi Transaksi Peminjaman
+        async function pinjamBuku() {
+            const bookIdInput = document.getElementById('book-id');
+            const memberIdInput = document.getElementById('member-id');
+            const messageDiv = document.getElementById('message');
+
+            const book_id = bookIdInput.value.trim();
+            const member_id = memberIdInput.value.trim();
+
+            // Reset pesan
+            messageDiv.style.display = "none";
+            messageDiv.className = "";
+
+            if (!book_id || !member_id) {
+                tampilkanPesan("ID Buku dan Member harus diisi!", "error");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/loans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ book_id, member_id })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    tampilkanPesan("✅ Buku berhasil dipinjam!", "success");
+                    bookIdInput.value = "";
+                    memberIdInput.value = "";
+                    fetchBooks(); 
+                } else {
+                    tampilkanPesan(result.message || result.error || "Gagal meminjam buku.", "error");
+                }
+            } catch (error) {
+                tampilkanPesan("Gagal terhubung ke server.", "error");
+            }
+        }
+
+        function tampilkanPesan(teks, tipe) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = teks;
+            messageDiv.className = tipe;
+            messageDiv.style.display = "block";
+        }
+
+        fetchBooks();
+    </script>
+</body>
+</html>
